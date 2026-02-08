@@ -1,38 +1,39 @@
-# AI Stack (Blitz)
+# AI Stack (Updated)
 
 ## IDE и плагины
 
-- PyCharm Professional:
-  - удобно для Python-интеграций, отладки и инспекций типов.
-- VSCode (альтернатива):
-  - Python, Pylance, Ruff, EditorConfig, GitLens.
-- Минимум для качества:
-  - форматирование/линт в pre-commit,
-  - статическая проверка типов (`mypy` поэтапно).
+- PyCharm / VSCode для разработки Python и интеграций.
+- Базовые плагины:
+  - Python/Pylance,
+  - линтер/форматтер,
+  - Git integration.
 
 ## Модели под задачи
 
-- Coding/implementation: сильная codegen-модель с хорошим tool-use.
-- Refactoring: модель с длинным контекстом и аккуратной работой по diff.
-- Code review/risk checks: модель, ориентированная на дефекты и edge cases.
-- Planning/architecture notes: модель с сильным reasoning и краткой структурной подачей.
+- Реализация кода: модель с strong tool-use и аккуратной работой с diff.
+- Рефакторинг: модель с длинным контекстом и контролем регрессий.
+- Ревью: модель с фокусом на баги, edge cases, сетевые риски.
+- Планирование: модель для коротких архитектурных решений и trade-offs.
 
-## MCP (если используется)
+## Текущий workflow в проекте
 
-- `filesystem`: безопасное чтение/редактирование проекта.
-- `git`: проверка diff, коммитов, истории.
-- `browser/web`: документация API/SDK, верификация актуальных ограничений.
-- `terminal/exec`: быстрые smoke-checks и запуск CLI.
+- `CLI-first`:
+  - основной production-флоу реализован как CLI (`pot/scripts/*`) + модульная логика (`pot/src/pot/*`).
+- `GUI wrapper`:
+  - `gui/pot_gui.py` дает операторский интерфейс поверх CLI-флагов,
+  - полезно для ручных запусков, диагностики и быстрых операций.
 
-## Полезные cursorrules/системные инструкции
+## MCP / tool stack
 
-- Стиль кода:
-  - Python 3.11+, typing в публичных функциях, dataclasses для DTO.
-- Надежность:
-  - явные timeout, bounded retries, понятные ошибки и logging.
-- Архитектура:
-  - разделять domain logic / transport / CLI слой.
-- Тестируемость:
-  - self-check/smoke режимы для быстрого CI даже без тяжелых тестов.
-- DX:
-  - короткий README с runnable-командами и ограничениями решения.
+- `filesystem`: чтение/правка кода и конфигов.
+- `git`: diff/status/история.
+- `terminal`: запуск smoke-check и end-to-end команд.
+- `web` (опционально): верификация внешних API и актуальных ограничений.
+
+## Полезные правила (cursorrules/system prompts)
+
+- Сначала логика в `src`, потом thin-wrapper в `scripts`, потом GUI контролы.
+- Публичные функции и модели: typing + dataclasses.
+- Явные timeout/retries/backoff для сетевых вызовов.
+- Логирование с уровнями INFO/WARNING/ERROR (+ DEBUG при отладке).
+- Документация должна содержать runnable команды и ограничения решения.

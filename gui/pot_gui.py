@@ -175,10 +175,20 @@ class App(tk.Tk):
         ttk.Button(frame, text="Browse", command=self._pick_message_file).grid(row=0, column=3, sticky="e", padx=8, pady=6)
 
         ttk.Label(frame, text="BOT_TOKEN").grid(row=1, column=0, sticky="w", padx=8, pady=6)
-        ttk.Entry(frame, textvariable=self.tg_token_var).grid(row=1, column=1, columnspan=3, sticky="ew", padx=8, pady=6)
+        token_entry = ttk.Entry(frame, textvariable=self.tg_token_var)
+        token_entry.grid(row=1, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
+        self._bind_clipboard_shortcuts(token_entry)
+        ttk.Button(frame, text="Paste", command=lambda: self._paste_into_var(self.tg_token_var)).grid(
+            row=1, column=3, sticky="e", padx=8, pady=6
+        )
 
         ttk.Label(frame, text="CHAT_ID").grid(row=2, column=0, sticky="w", padx=8, pady=6)
-        ttk.Entry(frame, textvariable=self.tg_chat_var).grid(row=2, column=1, columnspan=3, sticky="ew", padx=8, pady=6)
+        chat_entry = ttk.Entry(frame, textvariable=self.tg_chat_var)
+        chat_entry.grid(row=2, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
+        self._bind_clipboard_shortcuts(chat_entry)
+        ttk.Button(frame, text="Paste", command=lambda: self._paste_into_var(self.tg_chat_var)).grid(
+            row=2, column=3, sticky="e", padx=8, pady=6
+        )
 
         ttk.Label(frame, text="Log level").grid(row=3, column=0, sticky="w", padx=8, pady=6)
         ttk.Combobox(frame, textvariable=self.tg_log_level_var, values=["DEBUG", "INFO", "WARNING", "ERROR"], state="readonly").grid(
@@ -205,6 +215,7 @@ class App(tk.Tk):
 
         self.tg_message_text = tk.Text(editor_frame, height=14, wrap=tk.WORD)
         self.tg_message_text.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        self._bind_clipboard_shortcuts(self.tg_message_text)
 
         editor_scroll = ttk.Scrollbar(editor_frame, orient="vertical", command=self.tg_message_text.yview)
         editor_scroll.grid(row=0, column=1, sticky="ns", pady=6)
@@ -289,6 +300,35 @@ class App(tk.Tk):
         if path:
             self.tg_file_var.set(path)
             self._load_telegram_message_file(show_warning=False)
+
+    def _bind_clipboard_shortcuts(self, widget: tk.Widget) -> None:
+        widget.bind("<Control-v>", self._on_paste)
+        widget.bind("<Control-V>", self._on_paste)
+        widget.bind("<Shift-Insert>", self._on_paste)
+
+    def _on_paste(self, event: tk.Event) -> str:
+        widget = event.widget
+        try:
+            text = self.clipboard_get()
+        except tk.TclError:
+            return "break"
+
+        if isinstance(widget, tk.Text):
+            widget.insert(tk.INSERT, text)
+        else:
+            try:
+                widget.insert(tk.INSERT, text)
+            except tk.TclError:
+                pass
+        return "break"
+
+    def _paste_into_var(self, var: tk.StringVar) -> None:
+        try:
+            value = self.clipboard_get()
+        except tk.TclError:
+            messagebox.showwarning("Clipboard", "Clipboard is empty or unavailable")
+            return
+        var.set(value)
 
     def _load_telegram_message_file(self, show_warning: bool = True) -> None:
         file_path = Path(self.tg_file_var.get().strip())

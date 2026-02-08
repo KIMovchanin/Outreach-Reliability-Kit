@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from logging.handlers import RotatingFileHandler
+
+MAX_LOG_FILE_SIZE_BYTES = 3 * 1024 * 1024
+LOG_BACKUP_COUNT = 2
 
 
 def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
@@ -26,7 +30,13 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.L
             for handler in logger.handlers
         )
         if not has_same_file_handler:
-            file_handler = logging.FileHandler(file_path, mode="a", encoding="utf-8")
+            file_handler = RotatingFileHandler(
+                file_path,
+                mode="a",
+                maxBytes=MAX_LOG_FILE_SIZE_BYTES,
+                backupCount=LOG_BACKUP_COUNT,
+                encoding="utf-8",
+            )
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
 

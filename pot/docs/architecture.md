@@ -1,79 +1,72 @@
-# POT Architecture: 1200 Outreach Mailboxes
+# POT Architecture: 1200 Outreach Mailboxes (Updated)
 
 ## Цель
 
-Дешево и отказоустойчиво обслуживать ~1200 email-адресов для нескольких клиентов и направлений аутрича, с контролем deliverability и безопасной ротацией.
+Дешево и отказоустойчиво обслуживать ~1200 email-адресов для нескольких клиентов/направлений, с контролем deliverability и безопасной ротацией.
 
 ## Базовая схема
 
-- Контрольная плоскость:
-  - Scheduler (cron/Airflow-lite) создает задачи отправки по кампаниям.
-  - API/CLI для управления лимитами, паузами, stop-lists и health score.
+- Control plane:
+  - Scheduler формирует задания на отправку и проверку.
+  - Политики лимитов/пулов/suppression-листов.
 - Data plane:
-  - Очередь задач (`SQS`/`RabbitMQ`) с приоритетами клиентов.
-  - Пул воркеров отправки (stateless) обрабатывает сообщения и пишет события.
-- Хранилища:
-  - `PostgreSQL` (campaigns, mailbox state, quotas, suppression list).
-  - `Redis` (rate limits, short locks, idempotency keys).
-  - Object storage (логи сырых SMTP/API ответов, короткий retention).
+  - Очередь (`SQS`/`RabbitMQ`) + stateless workers.
+  - Отправка и сбор технических событий (SMTP/API ответы).
+- Storage:
+  - PostgreSQL (campaigns, mailbox state, quotas, suppression).
+  - Redis (rate limit counters, locks, idempotency).
+  - Object storage для сырых логов с retention.
 
-## Учетные записи, секреты, ротация
+## Operator tooling (актуально для этого репо)
 
-- Секреты хранить в Secret Manager (или Vault), не в коде/ENV-файлах на проде.
-- На каждый mailbox: `health_score`, последние бонсы/жалобы, cooldown.
-- Ротация inbox:
-  - Warmup 2-4 недели: постепенный рост объема.
-  - Лимиты по этапам (например 20 -> 40 -> 80+/день).
-  - Auto-pause при ухудшении метрик.
-- Разделять клиентов по доменам/поддоменам и sender pools.
+- CLI-режим:
+  - `pot/scripts/check_emails.py`
+  - `pot/scripts/send_telegram.py`
+- GUI-режим:
+  - `gui/pot_gui.py` как операторская оболочка над CLI,
+  - чекбоксы/поля для флагов,
+  - редактор Telegram-сообщения,
+  - live output и быстрая диагностика.
 
-## Политика отправки и нагрузка
+## Аккаунты, секреты, ротация
 
-- Rate limits:
-  - per inbox (час/день),
+- Секреты хранить в Secret Manager/Vault (на проде), не в открытых файлах.
+- На каждый mailbox вести `health_score`, bounce/complaint историю, cooldown.
+- Ротация:
+  - warmup 2-4 недели,
+  - поэтапный рост лимитов,
+  - auto-pause при деградации метрик.
+
+## Нагрузка и лимиты
+
+- Лимиты на 3 уровнях:
+  - per inbox,
   - per recipient domain,
-  - per campaign (burst cap).
-- Планировщик выбирает sender из пула по health score + доступному лимиту.
-- Retry стратегия: exponential backoff с jitter только для временных ошибок (4xx/API 429).
-- Circuit breaker на provider/domain: при серии отказов временно отключать маршрут.
+  - per campaign.
+- Retry только для временных сбоев (4xx/429), с backoff + jitter.
+- Circuit breaker для проблемных маршрутов/provider domain.
 
-## Мониторинг и SLO
+## Мониторинг
 
-- Технические метрики:
-  - SMTP/API error rate, queue lag, worker failures, retry depth.
-- Deliverability метрики:
-  - bounce rate, spam complaints, unsubscribe rate, reply rate.
-  - proxy inbox placement (seed mailboxes, open/reply proxy).
-- Репутационные проверки:
-  - blacklist мониторинг (Spamhaus и аналоги), DKIM/SPF/DMARC статус.
-- Алертинг:
-  - Slack/Telegram paging при аномалиях, росте bounce/complaints, деградации очередей.
-
-## Минимальная инфраструктура
-
-- Вариант low-cost:
-  - 1 VPS (2-4 vCPU) для воркеров + scheduler,
-  - Managed PostgreSQL (small tier),
-  - Managed Redis (минимальный tier),
-  - S3-compatible storage,
-  - Внешний почтовый провайдер/SMTP relay по необходимости.
-- Serverless-вариант:
-  - Queue + functions + managed DB/Redis,
-  - меньше ops, но выше цена при пиках и сложнее отладка.
+- Технические: queue lag, worker failures, SMTP/API error rate.
+- Deliverability: bounce rate, spam complaints, unsubscribe, reply rate.
+- Репутация: blacklist checks, SPF/DKIM/DMARC валидность.
+- Алертинг: Slack/Telegram для аномалий.
 
 ## Риски и mitigation
 
-- Блокировки провайдерами/доменные санкции: dedicated domains, разделение клиентских пулов.
-- DKIM/SPF/DMARC misconfig: автоматические preflight-checks перед запуском кампаний.
-- Shared IP reputation: по возможности выделенные IP/домены, не смешивать риск-пулы.
-- Утечка токенов/паролей: secret manager, short-lived credentials, audit trail.
-- Throttling/429/4xx: adaptive rate limits, backoff, circuit breaker.
+- Провайдерские блокировки: dedicated domains/pools.
+- Ошибки DNS/SPF/DKIM/DMARC: preflight-check перед кампаниями.
+- Shared IP reputation: изоляция high-risk трафика.
+- Утечки секретов: secret manager, least privilege, audit.
+- VPN/route блокировка SMTP 25: fallback на `format+MX` режим и запуск SMTP-check из сети с открытым egress 25.
 
-## Очень грубая стоимость/мес
+## Минимальная инфраструктура и стоимость (очень грубо)
 
-- VPS: $15-40
-- Managed PostgreSQL: $25-80
-- Managed Redis: $15-50
-- Monitoring/логирование: $10-60
-- Почтовые провайдеры/инфраструктура отправки: сильно зависит от объема, обычно $100+ при масштабировании
-- Итого старт: примерно $65-230+ без учета стоимости mailbox-парка и доменов.
+- VPS (workers + scheduler): $15-40/мес
+- Managed PostgreSQL: $25-80/мес
+- Managed Redis: $15-50/мес
+- Monitoring/logging: $10-60/мес
+- Почтовые провайдеры/доменная инфраструктура: от ~$100+/мес в зависимости от объема
+
+Итого стартовый контур: примерно $65-230+/мес без стоимости mailbox-пула и доменов.
