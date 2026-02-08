@@ -426,11 +426,27 @@ class App(tk.Tk):
         messagebox.showinfo("Saved", f"Saved credentials to {ORK_ENV_FILE}")
 
     def _start_process(self, cmd: list[str]) -> None:
-        self._append_output(f"\n$ {' '.join(cmd)}\n")
+        self._append_output(f"\n$ {self._format_cmd_for_output(cmd)}\n")
         try:
             self.runner.run(cmd, cwd=ROOT_DIR)
         except RuntimeError as exc:
             messagebox.showwarning("Process running", str(exc))
+
+    @staticmethod
+    def _format_cmd_for_output(cmd: list[str]) -> str:
+        redacted: list[str] = []
+        i = 0
+        while i < len(cmd):
+            part = cmd[i]
+            if part in ("--token", "--chat-id"):
+                redacted.append(part)
+                if i + 1 < len(cmd):
+                    redacted.append("***REDACTED***")
+                    i += 2
+                    continue
+            redacted.append(part)
+            i += 1
+        return " ".join(redacted)
 
     def _stop_process(self) -> None:
         self.runner.stop()
