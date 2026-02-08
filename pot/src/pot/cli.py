@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import time
 from typing import Sequence
 
@@ -17,6 +18,9 @@ DEFAULT_MAX_MX_TRIES = 2
 DEFAULT_DOMAIN_PAUSE_SEC = 0.3
 DEFAULT_MAIL_FROM = "verify@yourdomain.test"
 DEFAULT_HELO_HOST = "localhost"
+DEFAULT_DNS_RETRIES = 3
+DEFAULT_SMTP_RETRIES = 2
+DEFAULT_SMTP_HOST_COOLDOWN_SEC = 300.0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,7 +33,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--domain-pause", type=float, default=DEFAULT_DOMAIN_PAUSE_SEC, help="Pause between domains")
     parser.add_argument("--mail-from", default=DEFAULT_MAIL_FROM, help="MAIL FROM address used in SMTP probe")
     parser.add_argument("--helo-host", default=DEFAULT_HELO_HOST, help="Hostname for EHLO/HELO")
+    parser.add_argument("--skip-smtp", action="store_true", help="Only check email format and domain MX, skip SMTP RCPT probe")
+    parser.add_argument("--smtp-retries", type=int, default=DEFAULT_SMTP_RETRIES, help="SMTP retries per MX host")
+    parser.add_argument(
+        "--smtp-host-cooldown",
+        type=float,
+        default=DEFAULT_SMTP_HOST_COOLDOWN_SEC,
+        help="Cooldown seconds for MX host after timeout/network failure",
+    )
+    parser.add_argument(
+        "--dns-server",
+        action="append",
+        default=[],
+        help="Preferred DNS server (repeat flag to set multiple, e.g. --dns-server 1.1.1.1 --dns-server 8.8.8.8)",
+    )
+    parser.add_argument("--dns-retries", type=int, default=DEFAULT_DNS_RETRIES, help="DNS retries on timeout")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    parser.add_argument("--log-file", default="log.txt", help="Path to debug log file")
     parser.add_argument("--self-check", action="store_true", help="Run lightweight internal checks and exit")
     return parser
 
@@ -41,22 +61,50 @@ def check_emails(
     domain_pause: float,
     mail_from: str,
     helo_host: str,
+    dns_servers: list[str],
+    dns_retries: int,
+    smtp_retries: int,
+    skip_smtp: bool,
+    smtp_host_cooldown: float,
+    log_file: str,
 ) -> list[EmailCheckResult]:
-    logger = setup_logging()
-    mx_checker = DomainMXChecker(timeout=timeout, logger=logger)
+    logger = logging.getLogger("pot")
+    logger.info("Email check started: total=%s timeout=%s max_mx_tries=%s", len(emails), timeout, max_mx_tries)
+    logger.debug(
+        "Email check config: domain_pause=%s dns_servers=%s dns_retries=%s smtp_retries=%s skip_smtp=%s "
+        "smtp_host_cooldown=%s log_file=%s",
+        domain_pause,
+        dns_servers,
+        dns_retries,
+        smtp_retries,
+        skip_smtp,
+        smtp_host_cooldown,
+        log_file,
+    )
+    mx_checker = DomainMXChecker(
+        timeout=timeout,
+        logger=logger,
+        dns_servers=dns_servers,
+        dns_retries=dns_retries,
+    )
     smtp_checker = SMTPHandshakeChecker(
         config=SMTPCheckerConfig(
             timeout=timeout,
             max_mx_tries=max_mx_tries,
             mail_from=mail_from,
             helo_host=helo_host,
+            retry_attempts=smtp_retries,
+            host_failure_cooldown_sec=smtp_host_cooldown,
         ),
         logger=logger,
     )
 
     results: list[EmailCheckResult] = []
-    for email in emails:
+    for index, email in enumerate(emails, start=1):
+        email_started = time.monotonic()
+        logger.debug("Processing email %s/%s: %s", index, len(emails), email)
         if not is_valid_email_format(email):
+            logger.warning("Invalid email format: %s", email)
             results.append(
                 EmailCheckResult(
                     email=email,
@@ -71,13 +119,29 @@ def check_emails(
 
         domain = extract_domain(email)
         mx_result = mx_checker.lookup(domain)
+        logger.debug(
+            "MX result email=%s domain=%s status=%s hosts=%s detail=%s",
+            email,
+            domain,
+            mx_result.status,
+            mx_result.mx_hosts,
+            mx_result.detail,
+        )
         smtp_status = "unknown"
         smtp_detail = "SMTP skipped"
 
-        if mx_result.status == "valid":
+        if mx_result.status == "valid" and not skip_smtp:
             smtp_result = smtp_checker.verify(email, mx_result.mx_hosts)
             smtp_status = smtp_result.status
             smtp_detail = smtp_result.detail
+            logger.debug(
+                "SMTP result email=%s status=%s detail=%s",
+                email,
+                smtp_status,
+                smtp_detail,
+            )
+        elif mx_result.status == "valid" and skip_smtp:
+            smtp_detail = "SMTP skipped by flag --skip-smtp"
 
         results.append(
             EmailCheckResult(
@@ -89,8 +153,19 @@ def check_emails(
                 smtp_detail=smtp_detail,
             )
         )
+        elapsed = time.monotonic() - email_started
+        logger.info(
+            "Email processed %s/%s: email=%s domain_status=%s smtp_status=%s elapsed=%.3fs",
+            index,
+            len(emails),
+            email,
+            mx_result.status,
+            smtp_status,
+            elapsed,
+        )
         time.sleep(max(0.0, domain_pause))
 
+    logger.info("Email check finished: total=%s", len(results))
     return results
 
 
@@ -159,7 +234,7 @@ def run_self_check() -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    setup_logging(args.log_level)
+    setup_logging(args.log_level, log_file=args.log_file)
 
     if args.self_check:
         return run_self_check()
@@ -183,6 +258,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         domain_pause=max(0.0, args.domain_pause),
         mail_from=args.mail_from,
         helo_host=args.helo_host,
+        dns_servers=args.dns_server,
+        dns_retries=max(1, args.dns_retries),
+        smtp_retries=max(1, args.smtp_retries),
+        skip_smtp=args.skip_smtp,
+        smtp_host_cooldown=max(0.0, args.smtp_host_cooldown),
+        log_file=args.log_file,
     )
 
     if args.format == "jsonl":

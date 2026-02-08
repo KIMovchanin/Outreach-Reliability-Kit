@@ -1,0 +1,121 @@
+Polza Outreach Toolkit (POT) — краткая инструкция
+=================================================
+
+Где находится проект
+--------------------
+- Корень toolkit: pot/
+- Email checker CLI: pot/src/pot/cli.py
+- MX/DNS логика: pot/src/pot/email_check/domain_mx.py
+- SMTP handshake логика: pot/src/pot/email_check/smtp_handshake.py
+- Telegram sender: pot/src/pot/telegram_send/sender.py
+- Скрипты запуска:
+  - pot/scripts/check_emails.py
+  - pot/scripts/send_telegram.py
+
+
+1) Что нужно заполнить
+----------------------
+1. Перейти в проект:
+   cd pot
+
+2. Создать .env из шаблона:
+   cp .env.example .env
+
+3. Открыть файл pot/.env и вписать:
+   BOT_TOKEN=...ваш токен...
+   CHAT_ID=...ваш chat id...
+
+Откуда брать BOT_TOKEN:
+- Telegram -> @BotFather -> создать/выбрать бота -> получить токен.
+
+Откуда брать CHAT_ID:
+- Добавить бота в нужный приватный чат/группу.
+- Написать сообщение в чат.
+- Открыть в браузере:
+  https://api.telegram.org/bot<TOKEN>/getUpdates
+- Найти поле chat.id и взять его значение.
+
+
+2) Установка зависимостей
+-------------------------
+Из директории pot/:
+
+python3 -m venv .venv
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+
+3) Какие файлы подготовить
+--------------------------
+1. Список email-ов:
+   pot/data/emails.txt
+   (по одному email в строке)
+
+2. Текст для Telegram:
+   pot/data/message.txt
+
+
+4) Как запускать
+----------------
+Проверить, что email-checker в порядке:
+
+python3 scripts/check_emails.py --self-check
+
+Проверка email из файла:
+
+python3 scripts/check_emails.py --file data/emails.txt --format table
+
+Проверка email из аргументов:
+
+python3 scripts/check_emails.py --emails a@b.com c@d.com --format jsonl
+
+Запуск с настройками сети:
+
+python3 scripts/check_emails.py --file data/emails.txt --timeout 10 --max-mx-tries 3 --domain-pause 0.3
+python3 scripts/check_emails.py --file data/emails.txt --dns-server 1.1.1.1 --dns-server 8.8.8.8 --dns-retries 3
+python3 scripts/check_emails.py --file data/emails.txt --skip-smtp --dns-server 1.1.1.1 --dns-server 8.8.8.8
+python3 scripts/check_emails.py --file data/emails.txt --timeout 5 --max-mx-tries 1 --smtp-retries 1
+python3 scripts/check_emails.py --file data/emails.txt --timeout 5 --max-mx-tries 1 --smtp-retries 1 --smtp-host-cooldown 600
+python3 scripts/check_emails.py --file data/emails.txt --log-level DEBUG --log-file log.txt
+
+Отправка в Telegram:
+
+python3 scripts/send_telegram.py --file data/message.txt
+
+
+5) Что означают ключевые флаги email checker
+--------------------------------------------
+--file            путь к файлу с email
+--emails          email-ы прямо в аргументах
+--format          table или jsonl
+--timeout         сетевой timeout
+--max-mx-tries    сколько MX-хостов пробовать
+--domain-pause    пауза между доменами (rate limiting)
+--self-check      быстрый встроенный self-test
+--dns-server      DNS сервер для MX lookup (можно указывать несколько раз)
+--dns-retries     число повторов DNS при timeout
+--skip-smtp       пропустить SMTP RCPT-проверку, только формат+MX
+--smtp-retries    число повторов SMTP на один MX-хост
+--smtp-host-cooldown  сколько секунд не трогать MX после timeout/network fail
+--log-file        путь к log-файлу (по умолчанию log.txt)
+
+
+6) Где менять поведение в коде
+------------------------------
+- Дефолты timeout/retry/pause:
+  pot/src/pot/cli.py
+- Карта интерпретации SMTP RCPT-кодов:
+  pot/src/pot/email_check/smtp_handshake.py
+- MX lookup и кэш в памяти:
+  pot/src/pot/email_check/domain_mx.py
+
+
+7) Важные ограничения
+---------------------
+SMTP handshake не дает 100% гарантию существования ящика:
+- Catch-all домены могут отвечать 250 почти на все адреса.
+- Антиспам/политики серверов могут блокировать или маскировать проверку.
+- Временные ошибки (4xx) не означают окончательную недоставку.
+
+Использовать результат как полезную эвристику, а не абсолютный факт.

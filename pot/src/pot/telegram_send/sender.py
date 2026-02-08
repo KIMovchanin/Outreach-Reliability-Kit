@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from typing import Sequence
 
@@ -15,7 +16,7 @@ REQUEST_TIMEOUT_SEC = 15
 
 
 def send_message(token: str, chat_id: str, text: str) -> None:
-    logger = setup_logging()
+    logger = logging.getLogger("pot")
     url = f"{TELEGRAM_API_BASE}/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
 
@@ -52,7 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    setup_logging(args.log_level)
+    logger = setup_logging(args.log_level)
     load_dotenv()
 
     token = args.token or os.getenv("BOT_TOKEN", "")
@@ -75,6 +76,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         send_message(token=token, chat_id=chat_id, text=text)
     except RuntimeError as exc:
+        logger.error("Telegram send failed: %s", exc)
         print(f"Ошибка отправки: {exc}")
         return 3
 
