@@ -10,10 +10,10 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
-POT_DIR = ROOT_DIR / "pot"
-CHECK_SCRIPT = POT_DIR / "scripts" / "check_emails.py"
-TG_SCRIPT = POT_DIR / "scripts" / "send_telegram.py"
-POT_ENV_FILE = POT_DIR / ".env"
+ORK_DIR = ROOT_DIR / "ork"
+CHECK_SCRIPT = ORK_DIR / "scripts" / "check_emails.py"
+TG_SCRIPT = ORK_DIR / "scripts" / "send_telegram.py"
+ORK_ENV_FILE = ORK_DIR / ".env"
 
 
 class ProcessRunner:
@@ -112,7 +112,7 @@ class App(tk.Tk):
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=1)
 
-        self.email_file_var = tk.StringVar(value=str(POT_DIR / "data" / "emails.txt"))
+        self.email_file_var = tk.StringVar(value=str(ORK_DIR / "data" / "emails.txt"))
         self.email_list_var = tk.StringVar()
         self.format_var = tk.StringVar(value="table")
         self.timeout_var = tk.StringVar(value="8")
@@ -165,7 +165,7 @@ class App(tk.Tk):
         frame.columnconfigure(3, weight=1)
         frame.rowconfigure(6, weight=1)
 
-        self.tg_file_var = tk.StringVar(value=str(POT_DIR / "data" / "message.txt"))
+        self.tg_file_var = tk.StringVar(value=str(ORK_DIR / "data" / "message.txt"))
         self.tg_token_var = tk.StringVar(value=os.getenv("BOT_TOKEN", ""))
         self.tg_chat_var = tk.StringVar(value=os.getenv("CHAT_ID", ""))
         self.tg_log_level_var = tk.StringVar(value="INFO")
@@ -177,7 +177,6 @@ class App(tk.Tk):
         ttk.Label(frame, text="BOT_TOKEN").grid(row=1, column=0, sticky="w", padx=8, pady=6)
         token_entry = ttk.Entry(frame, textvariable=self.tg_token_var)
         token_entry.grid(row=1, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
-        self._bind_clipboard_shortcuts(token_entry)
         ttk.Button(frame, text="Paste", command=lambda: self._paste_into_var(self.tg_token_var)).grid(
             row=1, column=3, sticky="e", padx=8, pady=6
         )
@@ -185,7 +184,6 @@ class App(tk.Tk):
         ttk.Label(frame, text="CHAT_ID").grid(row=2, column=0, sticky="w", padx=8, pady=6)
         chat_entry = ttk.Entry(frame, textvariable=self.tg_chat_var)
         chat_entry.grid(row=2, column=1, columnspan=2, sticky="ew", padx=8, pady=6)
-        self._bind_clipboard_shortcuts(chat_entry)
         ttk.Button(frame, text="Paste", command=lambda: self._paste_into_var(self.tg_chat_var)).grid(
             row=2, column=3, sticky="e", padx=8, pady=6
         )
@@ -199,9 +197,10 @@ class App(tk.Tk):
         actions.grid(row=4, column=0, columnspan=4, sticky="w", padx=8, pady=8)
 
         ttk.Button(actions, text="Send Telegram Message", command=self._run_telegram_send).pack(side=tk.LEFT)
-        ttk.Button(actions, text="Save Token/Chat to pot/.env", command=self._save_telegram_env).pack(side=tk.LEFT, padx=8)
+        ttk.Button(actions, text="Save Token/Chat to ork/.env", command=self._save_telegram_env).pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text="Load Message from File", command=self._load_telegram_message_file).pack(side=tk.LEFT, padx=8)
         ttk.Button(actions, text="Save Message to File", command=self._save_telegram_message_file).pack(side=tk.LEFT, padx=8)
+        ttk.Button(actions, text="Paste to Editor", command=self._paste_into_editor).pack(side=tk.LEFT, padx=8)
 
         ttk.Label(
             frame,
@@ -215,7 +214,6 @@ class App(tk.Tk):
 
         self.tg_message_text = tk.Text(editor_frame, height=14, wrap=tk.WORD)
         self.tg_message_text.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
-        self._bind_clipboard_shortcuts(self.tg_message_text)
 
         editor_scroll = ttk.Scrollbar(editor_frame, orient="vertical", command=self.tg_message_text.yview)
         editor_scroll.grid(row=0, column=1, sticky="ns", pady=6)
@@ -301,27 +299,6 @@ class App(tk.Tk):
             self.tg_file_var.set(path)
             self._load_telegram_message_file(show_warning=False)
 
-    def _bind_clipboard_shortcuts(self, widget: tk.Widget) -> None:
-        widget.bind("<Control-v>", self._on_paste)
-        widget.bind("<Control-V>", self._on_paste)
-        widget.bind("<Shift-Insert>", self._on_paste)
-
-    def _on_paste(self, event: tk.Event) -> str:
-        widget = event.widget
-        try:
-            text = self.clipboard_get()
-        except tk.TclError:
-            return "break"
-
-        if isinstance(widget, tk.Text):
-            widget.insert(tk.INSERT, text)
-        else:
-            try:
-                widget.insert(tk.INSERT, text)
-            except tk.TclError:
-                pass
-        return "break"
-
     def _paste_into_var(self, var: tk.StringVar) -> None:
         try:
             value = self.clipboard_get()
@@ -329,6 +306,14 @@ class App(tk.Tk):
             messagebox.showwarning("Clipboard", "Clipboard is empty or unavailable")
             return
         var.set(value)
+
+    def _paste_into_editor(self) -> None:
+        try:
+            value = self.clipboard_get()
+        except tk.TclError:
+            messagebox.showwarning("Clipboard", "Clipboard is empty or unavailable")
+            return
+        self.tg_message_text.insert(tk.INSERT, value)
 
     def _load_telegram_message_file(self, show_warning: bool = True) -> None:
         file_path = Path(self.tg_file_var.get().strip())
@@ -437,8 +422,8 @@ class App(tk.Tk):
             messagebox.showerror("Input error", "BOT_TOKEN and CHAT_ID are required to save .env")
             return
 
-        POT_ENV_FILE.write_text(f"BOT_TOKEN={token}\nCHAT_ID={chat_id}\n", encoding="utf-8")
-        messagebox.showinfo("Saved", f"Saved credentials to {POT_ENV_FILE}")
+        ORK_ENV_FILE.write_text(f"BOT_TOKEN={token}\nCHAT_ID={chat_id}\n", encoding="utf-8")
+        messagebox.showinfo("Saved", f"Saved credentials to {ORK_ENV_FILE}")
 
     def _start_process(self, cmd: list[str]) -> None:
         self._append_output(f"\n$ {' '.join(cmd)}\n")

@@ -20,8 +20,8 @@
 ## Operator tooling (актуально для этого репо)
 
 - CLI-режим:
-  - `pot/scripts/check_emails.py`
-  - `pot/scripts/send_telegram.py`
+  - `ork/scripts/check_emails.py`
+  - `ork/scripts/send_telegram.py`
 - GUI-режим:
   - `gui/pot_gui.py` как операторская оболочка над CLI,
   - чекбоксы/поля для флагов,

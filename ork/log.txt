@@ -1,0 +1,4 @@
+2026-02-08 23:26:12,952 INFO ork - Email check started: total=1 timeout=3.0 max_mx_tries=2
+2026-02-08 23:26:12,956 INFO ork - Using custom DNS servers: 1.1.1.1
+2026-02-08 23:26:13,010 INFO ork - Email processed 1/1: email=test@gmail.com domain_status=valid smtp_status=unknown elapsed=0.050s
+2026-02-08 23:26:13,316 INFO ork - Email check finished: total=1

@@ -9,13 +9,13 @@ Production-oriented toolkit для двух задач:
 ## Что внутри
 
 ```text
-pot/
+ork/
   README.md
   requirements.txt
   .env.example
   .gitignore
   src/
-    pot/
+    ork/
       __init__.py
       cli.py
       email_check/
@@ -41,7 +41,7 @@ pot/
 
 ## Почему Есть И `src`, И `scripts`
 
-- `src/pot/...` содержит библиотечный код (бизнес-логика, переиспользуемые модули, dataclasses, проверки).
+- `src/ork/...` содержит библиотечный код (бизнес-логика, переиспользуемые модули, dataclasses, проверки).
 - `scripts/...` содержит тонкие CLI entrypoint-обертки для удобного запуска командами вида `python scripts/...`.
 
 Почему не складывать все в один слой:
@@ -50,8 +50,8 @@ pot/
 - одинаковые модули можно использовать из GUI, скриптов и будущих сервисов.
 
 Связка по именам намеренно похожая:
-- `scripts/check_emails.py` -> `src/pot/cli.py` + `src/pot/email_check/*`
-- `scripts/send_telegram.py` -> `src/pot/telegram_send/sender.py`
+- `scripts/check_emails.py` -> `src/ork/cli.py` + `src/ork/email_check/*`
+- `scripts/send_telegram.py` -> `src/ork/telegram_send/sender.py`
 
 ## Requirements
 
@@ -66,7 +66,7 @@ pot/
 Linux/macOS:
 
 ```bash
-cd pot
+cd ork
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -75,7 +75,7 @@ pip install -r requirements.txt
 Windows PowerShell:
 
 ```powershell
-cd pot
+cd ork
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -302,14 +302,14 @@ SMTP handshake не гарантирует фактическое существ
 
 ## Code Map
 
-- `src/pot/cli.py` - argparse и orchestration email-check flow
-- `src/pot/email_check/models.py` - dataclasses и типы статусов
-- `src/pot/email_check/validator.py` - нормализация и формат email
-- `src/pot/email_check/domain_mx.py` - DNS MX lookup, retries, cache
-- `src/pot/email_check/smtp_handshake.py` - SMTP handshake + status mapping
-- `src/pot/telegram_send/sender.py` - Telegram Bot API sender
-- `src/pot/utils/logging.py` - единая настройка логирования
-- `src/pot/utils/io.py` - безопасное чтение файлов
+- `src/ork/cli.py` - argparse и orchestration email-check flow
+- `src/ork/email_check/models.py` - dataclasses и типы статусов
+- `src/ork/email_check/validator.py` - нормализация и формат email
+- `src/ork/email_check/domain_mx.py` - DNS MX lookup, retries, cache
+- `src/ork/email_check/smtp_handshake.py` - SMTP handshake + status mapping
+- `src/ork/telegram_send/sender.py` - Telegram Bot API sender
+- `src/ork/utils/logging.py` - единая настройка логирования
+- `src/ork/utils/io.py` - безопасное чтение файлов
 
 ## Docs
 

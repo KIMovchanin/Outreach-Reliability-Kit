@@ -10,7 +10,7 @@ LOG_BACKUP_COUNT = 2
 
 def setup_logging(level: str = "INFO", log_file: str | None = None) -> logging.Logger:
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logger = logging.getLogger("pot")
+    logger = logging.getLogger("ork")
     logger.setLevel(log_level)
     logger.propagate = False
 

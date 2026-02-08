@@ -8,15 +8,15 @@ from typing import Sequence
 import requests
 from dotenv import load_dotenv
 
-from pot.utils.io import read_text
-from pot.utils.logging import setup_logging
+from ork.utils.io import read_text
+from ork.utils.logging import setup_logging
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
 REQUEST_TIMEOUT_SEC = 15
 
 
 def send_message(token: str, chat_id: str, text: str) -> None:
-    logger = logging.getLogger("pot")
+    logger = logging.getLogger("ork")
     url = f"{TELEGRAM_API_BASE}/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
 

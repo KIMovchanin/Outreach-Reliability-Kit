@@ -6,12 +6,12 @@ import logging
 import time
 from typing import Sequence
 
-from pot.email_check.domain_mx import DomainMXChecker
-from pot.email_check.models import EmailCheckResult
-from pot.email_check.smtp_handshake import SMTPCheckerConfig, SMTPHandshakeChecker
-from pot.email_check.validator import collect_emails, extract_domain, is_valid_email_format
-from pot.utils.io import read_lines
-from pot.utils.logging import setup_logging
+from ork.email_check.domain_mx import DomainMXChecker
+from ork.email_check.models import EmailCheckResult
+from ork.email_check.smtp_handshake import SMTPCheckerConfig, SMTPHandshakeChecker
+from ork.email_check.validator import collect_emails, extract_domain, is_valid_email_format
+from ork.utils.io import read_lines
+from ork.utils.logging import setup_logging
 
 DEFAULT_TIMEOUT = 8.0
 DEFAULT_MAX_MX_TRIES = 2
@@ -68,7 +68,7 @@ def check_emails(
     smtp_host_cooldown: float,
     log_file: str,
 ) -> list[EmailCheckResult]:
-    logger = logging.getLogger("pot")
+    logger = logging.getLogger("ork")
     logger.info("Email check started: total=%s timeout=%s max_mx_tries=%s", len(emails), timeout, max_mx_tries)
     logger.debug(
         "Email check config: domain_pause=%s dns_servers=%s dns_retries=%s smtp_retries=%s skip_smtp=%s "
